@@ -10,70 +10,59 @@ Automação completa utilizando n8n para integração entre:
 
 ## 🧠 Overview
 
-O fluxo automatiza o processamento de chamados GLPI, separando entre:
+Este fluxo automatiza o ciclo de vida de chamados corporativos, promovendo:
 
-- Chamados de Projeto
-- Chamados Operacionais
+- Integração entre Service Desk e gestão de projetos  
+- Classificação inteligente de tickets  
+- Redução de atividades manuais  
+- Aumento da visibilidade operacional  
+
+---
+
+## 🎯 Objetivo
+
+Criar uma camada de automação entre sistemas corporativos, garantindo:
+
+- Gestão eficiente de chamados  
+- Organização de demandas em backlog estruturado  
+- Monitoramento contínuo de SLA  
+- Apoio à tomada de decisão baseada em dados  
 
 ---
 
 ## ⚙️ Funcionalidades
 
 ✅ Integração com API do GLPI  
-✅ Classificação automática de chamados  
-✅ Criação de tarefas no Microsoft Planner  
-✅ Evita duplicações de tasks  
+✅ Classificação automática de chamados (Projeto vs Operacional)  
+✅ Criação automatizada de tarefas no Microsoft Planner  
+✅ Evita duplicação de atividades  
 ✅ Geração de painel "Gestão à Vista"  
-✅ Envio de dashboard para Teams  
+✅ Envio de dashboard para Microsoft Teams  
+✅ Consolidação de indicadores operacionais  
 
 ---
 
-## 🔗 Arquitetura
+## 🔗 Arquitetura (Visão Simplificada)
 
 GLPI → n8n → Tratamento → Planner → Teams
 
 ---
 
-## 📊 Inteligência Aplicada
+## 🏗️ Arquitetura da Solução
 
-- Normalização de categorias
-- Priorização automática
-- Identificação de SLA vencido
-- Ranking de chamados mais antigos
-- Consolidação de indicadores
+```mermaid
+flowchart LR
 
----
+A[GLPI API] --> B[n8n Workflow]
 
-## 🚧 Segurança
+B --> C[Data Processing]
+C --> D{Classification}
 
-⚠️ Este projeto é uma versão **SANITIZADA**  
-Nenhuma credencial real está incluída.
+D -->|Project| E[Microsoft Planner]
+D -->|Operational| F[SLA Analysis]
 
----
+F --> G[Metrics Engine]
+G --> H[Adaptive Card]
 
-## 🛠️ Como usar
-
-1. Importar o JSON no n8n  
-2. Configurar credenciais:
-   - GLPI API
-   - Microsoft Graph API
-3. Ajustar:
-   - Plan ID
-   - Bucket ID
-4. Executar fluxo
-
----
-
-## 🧩 Stack
-
-- n8n
-- GLPI API
-- Microsoft Graph API
-- JavaScript (Code Nodes)
-
----
-
-## 💡 Autor
-
-Pedro Henrique  
-Analista de Sistemas Sênior | ERP | Integrações | Automação | Data
+E --> I[Planner Tasks]
+H --> J[Microsoft Teams]
