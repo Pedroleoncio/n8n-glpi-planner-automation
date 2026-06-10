@@ -1,0 +1,565 @@
+{
+  "name": "Automação-GLPI",
+  "nodes": [
+    {
+      "parameters": {
+        "url": "Incluir a url API do GLPI",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Inclui Token de  autorização"
+            },
+            {
+              "name": "App-Token",
+              "value": "incluir APP TOKEN"
+            }
+          ]
+        },
+        "options": {
+          "allowUnauthorizedCerts": true
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        384,
+        -48
+      ],
+      "id": "*********************************",
+      "name": "Credenciamento"
+    },
+    {
+      "parameters": {
+        "url": "Incluir url de Ticket API GLPI",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {}
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Session-Token",
+              "value": "Incluir Token de seção"
+            },
+            {
+              "name": "App-Token",
+              "value": "Incluir APP Token"
+            }
+          ]
+        },
+        "options": {
+          "allowUnauthorizedCerts": true
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        608,
+        -48
+      ],
+      "id": "*******************************",
+      "name": "Requisição ticket",
+      "alwaysOutputData": false,
+      "executeOnce": true
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        160,
+        -48
+      ],
+      "id": "*******************************",
+      "name": "Inicio do Fluxo"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "*******************************",
+              "leftValue": "={{$json.isProjeto}}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1008,
+        -48
+      ],
+      "id": "*******************************",
+      "name": "If"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1232,
+        -144
+      ],
+      "id": "5341c477-74c4-4ea9-98ef-ae18febdd276",
+      "name": "Chamado com projeto"
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.all().map(item => {\n  const t = item.json;\n\n  const categoria = (t.itilcategories_id || \"\")\n    .replace(/&gt;/g, \">\")\n    .toUpperCase()\n    .trim();\n\n  const isProjeto = categoria.startsWith(\"PROJETO\");\n\n  return {\n    json: {\n      ...t, // ✅ mantém TODO o dado original\n      categoria_normalizada: categoria,\n      isProjeto: isProjeto\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        848,
+        -48
+      ],
+      "id": "994dd476-baf5-44ae-90b6-2d75d1ff2288",
+      "name": "Tratativa de categoria"
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.all().map(item => {\n  const t = item.json;\n\n  const tituloLimpo = (t.name || \"Sem título\")\n    .split(\">\")\n    .shift()\n    .trim();\n\n  return {\n    json: {\n      original: t,\n      id: t.id,\n      isProjeto: t.isProjeto,\n      title: `#${t.id} - ${tituloLimpo}`\n    }\n  };\n});"
+      },
+      "id": "5f9977ab-f602-4324-974f-264b4ed5f6df",
+      "name": "Script JS tratador Planner",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1440,
+        -144
+      ]
+    },
+    {
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 2,
+      "position": [
+        2032,
+        -144
+      ],
+      "id": "ca6262c2-3560-4afb-8feb-dde74953f96a",
+      "name": "Split In Batches"
+    },
+    {
+      "parameters": {
+        "jsCode": "const PLAN_ID   = \"CKYEqy96A0i5M_rIqD_Rh2UACONF\";\nconst BUCKET_ID = \"tPa8irp8aUKws8LPrQLgpmUABljo\";\n\nfunction mapPrioridade(p) {\n  if (p >= 5) return 1;\n  if (p == 4) return 3;\n  if (p == 3) return 5;\n  return 9;\n}\n\nreturn $input.all().map(item => {\n\n  const t = item.json.original;\n\n  const tecnico =\n    t._users_id_assign?.[0]?.name ||\n    t.users?.[\"2\"]?.[0]?.name ||\n    \"Não atribuído\";\n\n  const dataISO = t.date\n    ? new Date(t.date).toISOString()\n    : undefined;\n\n  return {\n    json: {\n      planId: PLAN_ID,\n      bucketId: BUCKET_ID,\n\n      title: item.json.title,\n\n      priority: mapPrioridade(Number(t.priority)),\n\n      startDateTime: dataISO,\n\n      description: `\n Chamado: #${t.id}\n\n ${t.name || \"Sem descrição\"}\n\n Técnico: ${tecnico}\n Abertura: ${t.date || \"—\"}\n Prioridade: ${t.priority || \"—\"}\n      `.trim(),\n\n      isProjeto: item.json.isProjeto\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1824,
+        -144
+      ],
+      "id": "db9a26dd-b34b-4b77-862d-ff7b4ae14b1e",
+      "name": "Montar Dados Task1"
+    },
+    {
+      "parameters": {
+        "jsCode": "// === Painel Gestão à Vista GLPI — visão macro (robusto) ===\n\nconst tickets = $('Tratativa de categoria').all().map(i => i.json);\nconst agora = Date.now();\nconst fmtData = d => d ? new Date(d).toLocaleDateString('pt-BR') : '—';\n\n// ---------- Normalizadores (aceitam número OU texto) ----------\nfunction nivelPrioridade(t) {\n  const p = t.priority;\n  const n = Number(p);\n  if (String(p ?? '').trim() !== '' && !isNaN(n)) return n; // veio número\n  const map = { 'muito baixa':1,'baixa':2,'média':3,'media':3,'normal':3,\n                'alta':4,'muito alta':5,'maior':6,'major':6 };\n  return map[String(p ?? '').toLowerCase().trim()] || 0;\n}\n\nfunction estaAberto(t) {\n  const s = t.status;\n  const n = Number(s);\n  if (String(s ?? '').trim() !== '' && !isNaN(n)) return [1,2,3,4].includes(n); // 1 a 4 = aberto\n  const str = String(s ?? '').toLowerCase().trim();\n  const fechado = ['soluc','resolv','fechado','solved','closed'];\n  if (fechado.some(x => str.includes(x))) return false;\n  return true; // desconhecido => trata como aberto\n}\n\nfunction dataValida(v) {\n  if (!v) return null;\n  const s = String(v).trim();\n  if (!s || s.startsWith('0000') || s.startsWith('1970')) return null;\n  const d = new Date(s.replace(' ', 'T'));\n  return isNaN(d.getTime()) ? null : d;\n}\n\n// Técnico atribuído — tenta vários formatos do GLPI\nfunction tecnicoDe(t) {\n  let a = t._users_id_assign;\n  if (Array.isArray(a) && a.length) return a[0].name || a[0].login || a[0].realname || 'Não atribuído';\n  if (a && typeof a === 'object') {\n    const v = Object.values(a);\n    if (v.length && v[0]) return v[0].name || v[0].login || v[0].realname || 'Não atribuído';\n  }\n  if (t.users && typeof t.users === 'object') {            // with_users keyed por tipo (2 = assign)\n    const at = t.users['2'] || t.users[2];\n    if (Array.isArray(at) && at.length) return at[0].name || at[0].login || 'Não atribuído';\n  }\n  if (typeof t.users_id_assign === 'string' && t.users_id_assign.trim()) return t.users_id_assign;\n  if (typeof t.users_id_recipient === 'string' && t.users_id_recipient.trim()) return t.users_id_recipient;\n  return 'Não atribuído';\n}\n\n// ---------- Agregações ----------\nconst abertos = tickets.filter(estaAberto);\nconst total = abertos.length;\n\n// Distribuição por prioridade\nconst critica = abertos.filter(t => nivelPrioridade(t) >= 5).length; // Muito Alta / Maior\nconst alta    = abertos.filter(t => nivelPrioridade(t) === 4).length;\nconst media   = abertos.filter(t => nivelPrioridade(t) === 3).length;\nconst baixa   = abertos.filter(t => nivelPrioridade(t) > 0 && nivelPrioridade(t) <= 2).length;\n\n// SLA vencido: prazo válido E no passado\nconst vencidos = abertos.filter(t => {\n  const prazo = dataValida(t.time_to_resolve);\n  return prazo && prazo.getTime() < agora;\n}).length;\n\n// Técnicos distintos com chamado em aberto\nconst tecnicosSet = new Set();\nfor (const t of abertos) {\n  const nome = tecnicoDe(t);\n  if (nome !== 'Não atribuído') tecnicosSet.add(nome);\n}\nconst tecnicos = tecnicosSet.size;\n\n// Sem responsável (gargalo de triagem)\nconst semResponsavel = abertos.filter(t => tecnicoDe(t) === 'Não atribuído').length;\n\n// Top 5 mais antigos em aberto\nconst top5 = [...abertos].filter(t => dataValida(t.date))\n  .sort((a, b) => dataValida(a.date) - dataValida(b.date))\n  .slice(0, 5);\n\nconst top5Items = [];\nfor (const t of top5) {\n  top5Items.push({ type: \"TextBlock\", text: `#${t.id} - ${t.name || 'Sem título'}`, wrap: true });\n  top5Items.push({ type: \"TextBlock\", text: `👨‍💻 ${tecnicoDe(t)}  ·  📅 ${fmtData(t.date)}`, spacing: \"None\", isSubtle: true });\n}\nif (top5Items.length === 0) top5Items.push({ type: \"TextBlock\", text: \"Nenhum chamado em aberto\", isSubtle: true });\n\nconsole.log(`Total:${total} Crítica:${critica} Alta:${alta} Média:${media} Baixa:${baixa} Vencidos:${vencidos} Técnicos:${tecnicos} SemResp:${semResponsavel}`);\n\n// ---------- Adaptive Card ----------\nconst card = {\n  type: \"AdaptiveCard\",\n  $schema: \"http://adaptivecards.io/schemas/adaptive-card.json\",\n  version: \"1.5\",\n  body: [\n    { type: \"TextBlock\", text: \"📊 Gestão à Vista GLPI\", weight: \"Bolder\", size: \"Large\", color: \"Accent\" },\n    { type: \"TextBlock\", text: fmtData(new Date()), spacing: \"None\", isSubtle: true },\n\n    { type: \"FactSet\", facts: [\n      { title: \"📋 Total em aberto\", value: String(total) },\n      { title: \"⏰ SLA vencido\",      value: String(vencidos) },\n      { title: \"👨‍💻 Técnicos ativos\", value: String(tecnicos) },\n      { title: \"🆕 Sem responsável\",  value: String(semResponsavel) }\n    ]},\n\n    { type: \"TextBlock\", text: \"⚠️ Por Prioridade\", weight: \"Bolder\", separator: true },\n    { type: \"FactSet\", facts: [\n      { title: \"🔴 Crítica (M.Alta/Maior)\", value: String(critica) },\n      { title: \"🟠 Alta\",  value: String(alta) },\n      { title: \"🟡 Média\", value: String(media) },\n      { title: \"🟢 Baixa\", value: String(baixa) }\n    ]},\n\n    { type: \"TextBlock\", text: \"🔴 Top 5 Mais Antigos\", weight: \"Bolder\", separator: true },\n    { type: \"Container\", style: \"attention\", items: top5Items }\n  ]\n};\n\nreturn [{\n  json: {\n    type: \"message\",\n    attachments: [{ contentType: \"application/vnd.microsoft.card.adaptive\", content: card }]\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1440,
+        80
+      ],
+      "id": "6867c204-ccf5-4d63-98f0-f16742d7a05c",
+      "name": "Script painel Teams"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1248,
+        80
+      ],
+      "id": "b42effee-e153-4c00-a302-fb580f6153c4",
+      "name": "Tratamento chamados sem projeto"
+    },
+    {
+      "parameters": {
+        "content": "                         Credenciamento API´s\n\n\n\n\n\n\n",
+        "height": 256,
+        "width": 464,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        304,
+        -128
+      ],
+      "id": "de47aca2-7c5b-4a2c-842f-96e114064706",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "content": "Processo de separação fluxo",
+        "height": 384,
+        "width": 352,
+        "color": 6
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        784,
+        -192
+      ],
+      "id": "6e2a4b5a-999d-45cb-a98f-9cb1c9d1495e",
+      "name": "Sticky Note1"
+    },
+    {
+      "parameters": {
+        "content": "Fluxo Planner",
+        "height": 208,
+        "width": 1520,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1168,
+        -192
+      ],
+      "id": "ddb45257-5c48-4858-baab-158e30389ac8",
+      "name": "Sticky Note2"
+    },
+    {
+      "parameters": {
+        "content": "Fluxo disparo painel Teams",
+        "height": 224,
+        "width": 992,
+        "color": 3
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1168,
+        32
+      ],
+      "id": "2a458507-36e2-400a-88a5-e2dec6f5d950",
+      "name": "Sticky Note3"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://graph.microsoft.com/v1.0/planner/tasks",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "microsoftOAuth2Api",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{$json}}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        2272,
+        -144
+      ],
+      "id": "8aa65f8d-8109-495e-9196-646381928aa3",
+      "name": "Criar Task Planner"
+    },
+    {
+      "parameters": {
+        "url": "Incluir Graph API da microsoft",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "microsoftOAuth2Api",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1344,
+        -320
+      ],
+      "id": "b652482d-e3e3-4522-a614-befcc40c57a6",
+      "name": "Buscar Tasks Planner",
+      "executeOnce": true,
+      "credentials": {
+        "microsoftOAuth2Api": {
+          "id": "TklTjvGNhFnkfROM",
+          "name": "Microsoft account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// === Filtrar tickets que já viraram task no Planner ===\n\n// 1) Tasks que já existem no plano (resposta do GET)\nconst resp = $('Buscar Tasks Planner').first().json;\nconst tasksExistentes = resp.value || [];\n\n// 2) Conjunto com os IDs de ticket já presentes\n//    (extraídos do título \"Projeto #NNNNN - ...\")\nconst idsExistentes = new Set();\nfor (const task of tasksExistentes) {\n  const m = (task.title || '').match(/#(\\d+)/);\n  if (m) idsExistentes.add(m[1]);\n}\n\n// 3) Tickets de projeto vindos do GLPI\nconst tickets = $('Chamado com projeto').all();\n\n// 4) Mantém só os que ainda NÃO têm task criada\nconst novos = tickets.filter(item => {\n  const id = String(item.json.id || '');\n  return id && !idsExistentes.has(id);\n});\n\nconsole.log(`Tickets de projeto: ${tickets.length} | Já existem: ${idsExistentes.size} | Novos a criar: ${novos.length}`);\n\nreturn novos;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1504,
+        -320
+      ],
+      "id": "bc059776-e8cf-4279-b9ac-c5614a1e3499",
+      "name": "Filtrar Duplicados"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "URL API Teams",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1696,
+        80
+      ],
+      "id": "42a0bc50-2902-4403-be26-592e908f5681",
+      "name": "Enviar Card Teams"
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{$json.id ? `https://graph.microsoft.com/v1.0/planner/tasks/${$json.id}/details` : ''}}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "microsoftOAuth2Api",
+        "sendHeaders": true,
+        "specifyHeaders": "json",
+        "jsonHeaders": "{\n  \"Content-Type\": \"application/json\",\n  \"If-Match\": \"*\"\n}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"description\": \"{{$json.description}}\",\n  \"appliedCategories\": {\n    \"category1\": {{$json.isProjeto}}\n  }\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        2480,
+        -144
+      ],
+      "id": "74a201f1-c346-4e54-ae87-70bb2d06b838",
+      "name": "HTTP Request",
+      "credentials": {
+        "microsoftOAuth2Api": {
+          "id": "TklTjvGNhFnkfROM",
+          "name": "Microsoft account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Credenciamento": {
+      "main": [
+        [
+          {
+            "node": "Requisição ticket",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Requisição ticket": {
+      "main": [
+        [
+          {
+            "node": "Tratativa de categoria",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Inicio do Fluxo": {
+      "main": [
+        [
+          {
+            "node": "Credenciamento",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Chamado com projeto",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Tratamento chamados sem projeto",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Chamado com projeto": {
+      "main": [
+        [
+          {
+            "node": "Buscar Tasks Planner",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tratativa de categoria": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Script JS tratador Planner": {
+      "main": [
+        [
+          {
+            "node": "Montar Dados Task1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split In Batches": {
+      "main": [
+        [
+          {
+            "node": "Criar Task Planner",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Montar Dados Task1": {
+      "main": [
+        [
+          {
+            "node": "Split In Batches",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Script painel Teams": {
+      "main": [
+        [
+          {
+            "node": "Enviar Card Teams",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tratamento chamados sem projeto": {
+      "main": [
+        [
+          {
+            "node": "Script painel Teams",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Criar Task Planner": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar Tasks Planner": {
+      "main": [
+        [
+          {
+            "node": "Filtrar Duplicados",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filtrar Duplicados": {
+      "main": [
+        [
+          {
+            "node": "Script JS tratador Planner",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "be8a8233-bd58-4f58-a103-c502a5f96510",
+  "meta": {
+    "instanceId": "1d06aa4c647c2903a4e1a705b7cfb138901ecf6cb68262f4cc1806e246f40a43"
+  },
+  "id": "**********************",
+  "tags": []
+}
